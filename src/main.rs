@@ -1,54 +1,46 @@
 use std::{env, error::Error, fs, process};
+use clap::{Arg, ArgAction, ArgMatches, command};
 use minigrep::{search,search_insensitive};
 
 fn main() {
-    let args : Vec<String> = env::args().collect();
+    let query = Arg::new("query").required(true);
 
-    // let config = Config::new(&args);
-    let config = Config::build(&args).unwrap_or_else(|err|{
-        eprint!("problem parsing the args : {err}");
-        process::exit(1);
-    });
+    let filepath = Arg::new("filepath").required(true);
 
-    if let Err(e) = run(config){
+    let ignorecase = Arg::new("ignore-case").short('i').long("ignore_case").action(ArgAction::SetTrue);
+
+    let matches = command!().about("This program can be used to search your file systems").
+                            arg(query).
+                            arg(filepath).
+                            arg(ignorecase).
+                            get_matches();
+
+    if let Err(e) = run(matches){
         eprint!("there was a problem reading the file :{e}");
         process::exit(1)
     }
 }
 
 
-struct Config{
-    query : String,
-    filename : String,
-    ignore_case : bool
-}
-
-impl Config{
-   fn build (args : &[String]) -> Result<Config,&str>{
-        if args.len()  < 3 {
-            return Err("not enough arugments")
-        }
-        let query = args[1].clone() ;
-        let filename =  args[2].clone();
-        let ignore_case = env::var("IGNORE_CASE").is_ok();
+fn run (matches : ArgMatches) -> Result<(),Box<dyn Error>>{
 
 
-        Ok(Config {query,filename,ignore_case})
-    }
-}
+    let file_path = matches.get_one::<String>("filepath").expect("filepath is required");
 
-fn run (config : Config) -> Result<(),Box<dyn Error>>{
+    let contents = fs::read_to_string(file_path)?;
 
-    let contents = fs::read_to_string(config.filename)?;
+    let query = matches.get_one::<String>("query").expect("query is required");
 
-    if config.ignore_case {
-        for line in search_insensitive( &config.query, &contents){
+    let ignore_case = matches.get_flag("ignore-case");
+
+    if ignore_case {
+        for line in search_insensitive( query, &contents){
             println!("{line}")
         }
     } 
 
     else{
-        for line in search( &config.query, &contents){
+        for line in search( query, &contents){
             println!("{line}")
         }
     }
