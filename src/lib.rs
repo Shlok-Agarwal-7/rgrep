@@ -1,23 +1,28 @@
-pub fn search<'a>(query : & str ,  contents : & 'a str) -> Vec<&'a str>{
+#[derive(Debug)]
+pub struct SearchResult<'a>{
+    pub line_number : usize,
+    pub line : &'a str 
+}
+
+pub fn search<'a>(query : & str ,  contents : & 'a str) -> Vec<SearchResult<'a>>{
     let mut vec = Vec::new();
 
-    for line in contents.lines(){
+    for (i ,line) in contents.lines().enumerate(){
         if line.contains(query){
-            vec.push(line);
+            vec.push(SearchResult { line_number: (i + 1), line });
         }
     }
-
     vec
 }
 
-pub fn search_insensitive<'a>(query : & str ,  contents : & 'a str) -> Vec<&'a str>{
+pub fn search_insensitive<'a>(query : & str ,  contents : & 'a str) -> Vec<SearchResult<'a>>{
     let mut vec = Vec::new();
 
     let query = query.to_lowercase();
 
-    for line in contents.lines(){
+    for (i,line) in contents.lines().enumerate(){
         if line.to_lowercase().contains(&query){
-            vec.push(line);
+            vec.push(SearchResult { line_number: (i + 1), line });
         }
     }
     vec
@@ -38,7 +43,7 @@ Pick Three";
             assert_eq!(vec!["Simple,fast,productive"],search(query,content))
     }
 
-    #[test]
+#[test] 
     fn case_insensitive(){
         let query = "siMpLe";
         let content = "\

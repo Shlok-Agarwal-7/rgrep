@@ -1,6 +1,6 @@
-use std::{env, error::Error, fs, process};
+use std::{env, error::Error, fs, path::PathBuf, process};
 use clap::{Arg, ArgAction, ArgMatches, command};
-use minigrep::{search,search_insensitive};
+use minigrep::{search,search_insensitive,SearchResult};
 
 
 pub enum IgnoreCase{
@@ -9,34 +9,37 @@ pub enum IgnoreCase{
 }
 
 pub struct SearchConfig{
-    filepath : String,
+    filepaths : Vec<PathBuf>,
     query : String,
-    ignorecase : IgnoreCase,
-    linenumber : bool
+    ignore_case : IgnoreCase,
+    line_number : bool
 }
-
 
 impl SearchConfig {
     pub fn build(matches : ArgMatches) -> SearchConfig{
         let  query = matches.get_one::<String>("query").expect("query cannot be empty");
-        let  filepath=matches.get_one::<String>("filepath").expect("file path cannot be empty");
-        let ignorecase = if matches.get_flag("ignore-case") {
+        let  filepaths  = matches.get_many::<PathBuf>("filepath").unwrap_or_default().cloned().collect();
+        let ignore_case = if matches.get_flag("ignore-case") {
                     IgnoreCase::SearchInsensitive
                 } else {
                     IgnoreCase::SearchSensitive
                 };
 
-        let linenumber = matches.get_flag("line-number");
-        SearchConfig { filepath: (filepath.clone()), 
+        let line_number = matches.get_flag("line-number");
+        SearchConfig { filepaths, 
                        query: (query.clone()), 
-                       ignorecase,
-                       linenumber}
+                       ignore_case,
+                       line_number}
     }
 }
 fn main() {
     let query = Arg::new("query").required(true);
 
-    let filepath = Arg::new("filepath").required(true);
+    let filepath = Arg::new("filepath")
+                                .required(true)
+                                .value_parser(clap::value_parser!(PathBuf))
+                                .action(ArgAction::Set)
+                                .num_args(1..);
 
     let ignorecase = Arg::new("ignore-case").short('i').long("ignore-case").action(ArgAction::SetTrue);
 
@@ -59,19 +62,27 @@ fn main() {
 
 
 fn run (config : SearchConfig) -> Result<(),Box<dyn Error>>{
-   let contents = fs::read_to_string(config.filepath)?;
-   
-   let result = match  config.ignorecase{
-        IgnoreCase::SearchInsensitive => search_insensitive(&config.query, &contents),
-        IgnoreCase::SearchSensitive => search(&config.query, &contents)
-   };
+   for filepath in &config.filepaths{
+        let filename = filepath
+            .file_name()
+            .ok_or("path does not contain a filename")?
+            .to_str()
+            .ok_or("path is not valid UTF-8")?;
 
-   for line in result{
-        if config.linenumber{
-            println!("{}",line);
-        }
-        else{
-            println!("{}",line);
+        let contents = fs::read_to_string(filepath)?;
+        
+        let result = match  config.ignore_case{
+                IgnoreCase::SearchInsensitive => search_insensitive(&config.query, &contents),
+                IgnoreCase::SearchSensitive => search(&config.query, &contents)
+        };
+
+        for SearchResult{line_number,line} in result{
+                if config.line_number{
+                    println!("{}::{}:{} ",filename,line_number,line);
+                }
+                else{
+                    println!("{}::{}",filename,line);
+                }
         }
    }
 
