@@ -12,7 +12,8 @@ pub struct SearchConfig{
     filepaths : Vec<PathBuf>,
     query : String,
     ignore_case : IgnoreCase,
-    line_number : bool
+    line_number : bool,
+    invert_match : bool
 }
 
 impl SearchConfig {
@@ -24,12 +25,13 @@ impl SearchConfig {
                 } else {
                     IgnoreCase::SearchSensitive
                 };
-
         let line_number = matches.get_flag("line-number");
+        let invert_match = matches.get_flag("invert_match");
         SearchConfig { filepaths, 
                        query: (query.clone()), 
                        ignore_case,
-                       line_number}
+                       line_number,
+                       invert_match}
     }
 }
 fn main() {
@@ -41,15 +43,18 @@ fn main() {
                                 .action(ArgAction::Set)
                                 .num_args(1..);
 
-    let ignorecase = Arg::new("ignore-case").short('i').long("ignore-case").action(ArgAction::SetTrue);
+    let ignore_case = Arg::new("ignore-case").short('i').long("ignore-case").action(ArgAction::SetTrue);
 
     let enable_line_number = Arg::new("line-number").short('n').long("line-number").action(ArgAction::SetTrue);
+
+    let invert_match = Arg::new("invert_match").short('v').long("invert").action(ArgAction::SetTrue);
 
     let matches = command!().about("This program can be used to search your file systems").
                             arg(query).
                             arg(filepath).
-                            arg(ignorecase).
+                            arg(ignore_case).
                             arg(enable_line_number).
+                            arg(invert_match).
                             get_matches();
     
     let config = SearchConfig::build(matches);
@@ -72,8 +77,8 @@ fn run (config : SearchConfig) -> Result<(),Box<dyn Error>>{
         let contents = fs::read_to_string(filepath)?;
         
         let result = match  config.ignore_case{
-                IgnoreCase::SearchInsensitive => search_insensitive(&config.query, &contents),
-                IgnoreCase::SearchSensitive => search(&config.query, &contents)
+                IgnoreCase::SearchInsensitive => search_insensitive(&config.query, &contents,config.invert_match),
+                IgnoreCase::SearchSensitive => search(&config.query, &contents,config.invert_match)
         };
 
         for SearchResult{line_number,line} in result{
