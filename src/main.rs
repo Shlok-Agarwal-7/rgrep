@@ -1,39 +1,8 @@
 use std::{env, error::Error, fs, path::PathBuf, process};
-use clap::{Arg, ArgAction, ArgMatches, command};
-use minigrep::{search,search_insensitive,SearchResult};
+use clap::{Arg, ArgAction,command};
+use minigrep::search::{search,search_insensitive,SearchResult};
+use minigrep::config::{CaseSensitivity,SearchConfig};
 
-
-pub enum IgnoreCase{
-    SearchInsensitive,
-    SearchSensitive
-}
-
-pub struct SearchConfig{
-    filepaths : Vec<PathBuf>,
-    query : String,
-    ignore_case : IgnoreCase,
-    line_number : bool,
-    invert_match : bool
-}
-
-impl SearchConfig {
-    pub fn build(matches : ArgMatches) -> SearchConfig{
-        let  query = matches.get_one::<String>("query").expect("query cannot be empty");
-        let  filepaths  = matches.get_many::<PathBuf>("filepath").unwrap_or_default().cloned().collect();
-        let ignore_case = if matches.get_flag("ignore-case") {
-                    IgnoreCase::SearchInsensitive
-                } else {
-                    IgnoreCase::SearchSensitive
-                };
-        let line_number = matches.get_flag("line-number");
-        let invert_match = matches.get_flag("invert_match");
-        SearchConfig { filepaths, 
-                       query: (query.clone()), 
-                       ignore_case,
-                       line_number,
-                       invert_match}
-    }
-}
 fn main() {
     let query = Arg::new("query").required(true);
 
@@ -76,9 +45,9 @@ fn run (config : SearchConfig) -> Result<(),Box<dyn Error>>{
 
         let contents = fs::read_to_string(filepath)?;
         
-        let result = match  config.ignore_case{
-                IgnoreCase::SearchInsensitive => search_insensitive(&config.query, &contents,config.invert_match),
-                IgnoreCase::SearchSensitive => search(&config.query, &contents,config.invert_match)
+        let result = match  config.case_sensitivity{
+                CaseSensitivity::Insensitive => search_insensitive(&config.query, &contents,config.invert_match),
+                CaseSensitivity::Sensitive => search(&config.query, &contents,config.invert_match)
         };
 
         for SearchResult{line_number,line} in result{
